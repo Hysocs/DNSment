@@ -35,8 +35,8 @@
 
 <table>
   <tr>
-    <td><img src="[https://imgur.com/KP1vyeN](https://i.imgur.com/KP1vyeN.png)" alt="Screenshot1"></td>
-    <td><img src="[https://imgur.com/u4SkNyy](https://i.imgur.com/u4SkNyy.png)" alt="Screenshot2"></td>
+    <td><img src="https://i.imgur.com/u4SkNyy.png" alt="Screenshot1"></td>
+    <td><img src="https://i.imgur.com/u4SkNyy.png" alt="Screenshot2"></td>
   </tr>
 </table>
 
