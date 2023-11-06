@@ -33,10 +33,9 @@
 
 ## 🖼️ Screenshots
 
-**DNSment GUI**
-![DNSment GUI](https://i.imgur.com/KP1vyeN.png)
+![Screenshot 1](https://imgur.com/KP1vyeN)
 
-![DNSment GUI](https://i.imgur.com/u4SkNyy.png)
+![Screenshot 2](https://imgur.com/u4SkNyy)
 
 ---
 
