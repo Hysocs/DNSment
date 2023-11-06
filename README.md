@@ -31,6 +31,16 @@
 
 ---
 
+## 🖼️ Screenshots
+
+**Screenshot 1 - DNSment GUI**
+![DNSment GUI](https://i.imgur.com/KP1vyeN.png)
+
+**Screenshot 2 - Scanning in Progress**
+![Scanning in Progress](https://i.imgur.com/u4SkNyy.png)
+
+---
+
 ## ⚠️ Disclaimer
 
 **Intended Use**: DNSment is developed for legitimate optimization purposes. Any misuse or malicious intent is strictly prohibited.
