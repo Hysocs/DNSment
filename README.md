@@ -33,9 +33,12 @@
 
 ## 🖼️ Screenshots
 
-![Screenshot 1](https://imgur.com/KP1vyeN)
-
-![Screenshot 2](https://imgur.com/u4SkNyy)
+<table>
+  <tr>
+    <td><img src="[https://media.discordapp.net/attachments/1143176304766767174/1143179165412110356/image.png?width=782&height=473](https://cdn.discordapp.com/attachments/361557619217006604/1171056081733177354/image.png?ex=655b49f7&is=6548d4f7&hm=f2ef0dab945b9c7cc944542dee8eb57c003edd2191b0f9610a65d3c4574b0016&)" alt="Screenshot1"></td>
+    <td><img src="[https://media.discordapp.net/attachments/1143176304766767174/1143179166376800387/image_3-fotor-2023082193224.png?width=782&height=473](https://discord.com/channels/260575990739238912/361557619217006604/1171056090809643058)" alt="Screenshot2"></td>
+  </tr>
+</table>
 
 ---
 
