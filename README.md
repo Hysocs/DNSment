@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://imgur.com/aZekRMC">
-    <img src="https://i.imgur.com/aZekRMC.png" alt="Image from Imgur">
+  <a href="https://imgur.com/gTU0dzX">
+    <img src="https://i.imgur.com/gTU0dzX.png" alt="DNSment Logo">
   </a>
 </p>
 
