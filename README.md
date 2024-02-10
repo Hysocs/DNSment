@@ -62,5 +62,3 @@
 For detailed usage instructions and troubleshooting, please refer to the repository's documentation.
 
 ---
-
-For feedback, contributions, or issues, please refer to the [repository's issue tracker](https://github.com/Hysocs/DNSment/issues).
