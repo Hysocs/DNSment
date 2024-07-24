@@ -1,9 +1,3 @@
-<p align="center">
-  <a href="https://imgur.com/gTU0dzX">
-    <img src="https://i.imgur.com/gTU0dzX.png" alt="DNSment Logo">
-  </a>
-</p>
-
 # DNSment - Fast DNS Server Scanner
 
 **DNSment** is a powerful DNS server scanning tool that helps you identify the best DNS server for your needs. Whether you're looking to optimize your internet connection's speed or ensure a reliable online experience, DNSment makes the process easy and efficient.
