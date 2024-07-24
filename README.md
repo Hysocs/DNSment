@@ -36,16 +36,6 @@
 
 ---
 
-## ⚠️ Disclaimer
-
-**Intended Use**: DNSment is developed for legitimate optimization purposes. Any misuse or malicious intent is strictly prohibited.
-
-**User Responsibility**: Users are encouraged to use DNSment responsibly and adhere to relevant laws and regulations.
-
-**Data Privacy**: DNSment operates locally and does not store or transmit user data. Your privacy is our priority.
-
----
-
 ## Getting Started
 
 1. Clone or download the DNSment repository to your local machine.
