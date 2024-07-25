@@ -2,14 +2,18 @@ import sys
 import subprocess
 import re
 import time
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPlainTextEdit, QPushButton, QProgressBar, QLabel, QCheckBox, QDialog, QVBoxLayout, QLineEdit
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QPlainTextEdit, QPushButton, QProgressBar, QLabel, 
+    QCheckBox, QDialog, QVBoxLayout, QSlider, QHBoxLayout, QLineEdit
+)
 from PyQt5.QtCore import Qt, QThread, pyqtSlot, pyqtSignal
+from concurrent.futures import ThreadPoolExecutor
 
 class DnsScannerWorker(QThread):
     scanningFinished = pyqtSignal(list)
-    progressUpdate = pyqtSignal(int, int)
+    progressUpdate = pyqtSignal(int)
 
-    def __init__(self, dns_servers, ping_count, ping_delay, stability_threshold, scan_user_dns, parallel_scan, total_servers):
+    def __init__(self, dns_servers, ping_count, ping_delay, stability_threshold, scan_user_dns, parallel_scan):
         super().__init__()
         self.dns_servers = dns_servers
         self.ping_count = ping_count
@@ -17,18 +21,15 @@ class DnsScannerWorker(QThread):
         self.stability_threshold = stability_threshold
         self.scan_user_dns = scan_user_dns
         self.parallel_scan = parallel_scan
-        self.total_servers = total_servers  # Store total_servers as an instance variable
-        self.progress = [0, 0]
+        self.total_pings = len(dns_servers) * ping_count
 
     def run(self):
         if self.parallel_scan:
             results = self.scan_dns_servers_parallel()
         else:
             results = self.scan_dns_servers()
-
         best_server, best_avg_ping, packet_loss_rate = self.find_best_dns_server(results)
         self.scanningFinished.emit([best_server, best_avg_ping, packet_loss_rate])
-
 
     def ping_server(self, host, count=50, delay=0.1):
         pings = []
@@ -40,6 +41,7 @@ class DnsScannerWorker(QThread):
                     pings.extend(result)
                 else:
                     packet_loss_count += 1
+                self.progressUpdate.emit(1)  # Update progress for each ping
                 time.sleep(delay)
             return host, pings, packet_loss_count
         except Exception as e:
@@ -53,39 +55,27 @@ class DnsScannerWorker(QThread):
 
     def scan_dns_servers(self):
         results = []
-
-        for i, server in enumerate(self.dns_servers, start=1):
-            result = self.ping_server(server)
+        for server in self.dns_servers:
+            result = self.ping_server(server, self.ping_count, self.ping_delay)
             if result:
                 results.append(result)
-                self.progressUpdate.emit(i, len(self.dns_servers))
-            self.progress[0] = i
-        self.progress[1] = len(self.dns_servers)
+            self.progressUpdate.emit(self.ping_count)  # Update progress for each server
         return results
-    
+
     def scan_dns_servers_parallel(self):
         results = []
-
-        def scan(server):
-            result = self.ping_server(server)
-            if result:
-                results.append(result)
-                self.progressUpdate.emit(len(results), self.total_servers)
-
-        from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(scan, server) for server in self.dns_servers]
-
-        # Wait for all futures to complete
-        for future in futures:
-            future.result()
-
+            futures = [executor.submit(self.ping_server, server, self.ping_count, self.ping_delay) for server in self.dns_servers]
+            for future in futures:
+                result = future.result()
+                if result:
+                    results.append(result)
+                self.progressUpdate.emit(self.ping_count)  # Update progress for each server
         return results
-    
+
     def calculate_stability(self, pings):
         if len(pings) < 2:
             return 100.0
-
         total_stability = sum(1.0 - abs(pings[i] - pings[i - 1]) / 100.0 for i in range(1, len(pings)))
         return total_stability / (len(pings) - 1)
 
@@ -110,7 +100,10 @@ class DnsScannerWorker(QThread):
 class DnsScannerApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.default_dns_servers = ["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9", "149.112.112.112", "208.67.222.222", "208.67.220.220"]  # Define default DNS servers
+        self.default_dns_servers = [
+            "1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4", "9.9.9.9", "149.112.112.112", 
+            "208.67.222.222", "208.67.220.220"
+        ]
         self.init_ui()
         self.async_task = None
         self.total_servers = 0
@@ -147,76 +140,55 @@ class DnsScannerApp(QMainWindow):
 
     def open_settings_dialog(self):
         settings_dialog = SettingsDialog(self)
-        settings_dialog.include_current_dns_checkbox.setChecked(self.scan_user_dns)  # Set the state of the "Include current DNS" checkbox
-        settings_dialog.parallel_scan_checkbox.setChecked(self.parallel_scan)  # Set the state of the "Scan in parallel" checkbox
+        settings_dialog.include_current_dns_checkbox.setChecked(self.scan_user_dns)
+        settings_dialog.parallel_scan_checkbox.setChecked(self.parallel_scan)
+        settings_dialog.ping_slider.setValue(self.ping_count)
+        settings_dialog.ping_count_display.setText(str(self.ping_count))
         settings_dialog.exec_()
 
     def toggle_user_dns(self, state):
-        if state == Qt.Checked:
-            self.scan_user_dns = True
-        else:
-            self.scan_user_dns = False
-
+        self.scan_user_dns = state == Qt.Checked
         self.update_total_servers()
         self.progress_label.setText(f"0/{self.total_servers}")
 
     def toggle_parallel_scan(self, state):
-        if state == Qt.Checked:
-            self.parallel_scan = True
-        else:
-            self.parallel_scan = False
+        self.parallel_scan = state == Qt.Checked
 
     def update_total_servers(self):
-        if self.scan_user_dns:
-            combined_servers = self.default_dns_servers + self.get_user_dns_servers()
-        else:
-            combined_servers = self.default_dns_servers
-
-        print("Before update_total_servers:", combined_servers)  # Debug print
+        combined_servers = self.default_dns_servers + self.get_user_dns_servers() if self.scan_user_dns else self.default_dns_servers
         self.total_servers = len(combined_servers)
         self.dns_servers = combined_servers
         self.progress_label.setText(f"0/{self.total_servers}")
-        print("After update_total_servers:", combined_servers)  # Debug print
 
     def get_user_dns_servers(self):
         try:
             result = subprocess.run(['ipconfig', '/all'], capture_output=True, text=True, shell=True)
             output = result.stdout
-
-            # Extract DNS Servers using regular expressions for both IPv4 and IPv6
             dns_servers_ipv4 = re.findall(r'DNS Servers[ .]+: (\d+\.\d+\.\d+\.\d+)', output)
             dns_servers_ipv6 = re.findall(r'DNS Servers[ .]+: ([0-9a-fA-F:]+)', output)
             dns_servers_ipv4.extend(re.findall(r'DNS Server .+ : (\d+\.\d+\.\d+\.\d+)', output))
             dns_servers_ipv6.extend(re.findall(r'DNS Server .+ : ([0-9a-fA-F:]+)', output))
-
-            # Combine the lists of both IPv4 and IPv6 DNS servers
             dns_servers = dns_servers_ipv4 + dns_servers_ipv6
-
-            # Filter out duplicate addresses
             unique_dns_servers = list(set(dns_servers))
-
-            # Filter out entries that don't match IPv4 or IPv6 format
             valid_dns_servers = [server for server in unique_dns_servers if re.match(r'(\d+\.\d+\.\d+\.\d+|[0-9a-fA-F:]+)', server) and (':' in server or '.' in server)]
-
-            # Debug print
-            print("User DNS Servers:", valid_dns_servers)
-
             return valid_dns_servers
         except Exception as e:
             return []
 
-    def update_progress(self, current, total):
-        progress = int((current / total) * 100)
-        self.progress_bar.setValue(progress)
-        self.progress_label.setText(f"{current}/{total}")
+    def update_progress(self, progress_increment):
+        self.progress_bar.setValue(self.progress_bar.value() + progress_increment)
+        completed_pings = self.progress_bar.value()
+        completed_servers = completed_pings // self.ping_count
+        self.progress_label.setText(f"{completed_servers}/{self.total_servers}")
 
     def start_scanning(self):
         if self.is_scanning:
             return
 
         self.text_edit.clear()
-        self.progress_bar.setMaximum(100)
         self.update_total_servers()
+        self.total_pings = self.total_servers * self.ping_count
+        self.progress_bar.setMaximum(self.total_pings)
         self.progress_bar.setValue(0)
         self.progress_label.setText(f"0/{self.total_servers}")
 
@@ -225,10 +197,11 @@ class DnsScannerApp(QMainWindow):
             return
 
         self.is_scanning = True
-        self.scan_button.setEnabled(False)  # Disable the button
+        self.scan_button.setEnabled(False)
 
         self.async_task = DnsScannerWorker(
-            self.dns_servers, self.ping_count, self.ping_delay, self.stability_threshold, self.scan_user_dns, self.parallel_scan, self.total_servers
+            self.dns_servers, self.ping_count, self.ping_delay, self.stability_threshold, self.scan_user_dns, 
+            self.parallel_scan
         )
         self.async_task.scanningFinished.connect(self.scanning_finished)
         self.async_task.progressUpdate.connect(self.update_progress)
@@ -239,7 +212,7 @@ class DnsScannerApp(QMainWindow):
     @pyqtSlot()
     def scanning_done(self):
         self.is_scanning = False
-        self.scan_button.setEnabled(True) 
+        self.scan_button.setEnabled(True)
 
     @pyqtSlot(list)
     def scanning_finished(self, result):
@@ -247,8 +220,7 @@ class DnsScannerApp(QMainWindow):
 
         if best_server:
             message = "You are already using the best DNS server." if self.scan_user_dns and best_server in self.user_dns_servers else "Best DNS server to use:"
-            self.text_edit.insertPlainText(message)
-            self.text_edit.insertPlainText(f"\nDNS Server: {best_server}\nAverage Ping: {best_avg_ping:.2f} ms\nPacket Loss Rate: {packet_loss_rate:.2f}%")
+            self.text_edit.insertPlainText(f"{message}\nDNS Server: {best_server}\nAverage Ping: {best_avg_ping:.2f} ms\nPacket Loss Rate: {packet_loss_rate:.2f}%")
         else:
             self.text_edit.insertPlainText("No DNS server could be determined")
         self.scan_button.setEnabled(True)
@@ -256,17 +228,17 @@ class DnsScannerApp(QMainWindow):
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent = parent  # Store the parent as an instance variable
+        self.parent = parent
         self.setWindowTitle("Settings")
-        self.setGeometry(200, 200, 250, 230)
+        self.setGeometry(200, 200, 250, 280)
 
         layout = QVBoxLayout()
 
-        dns_label = QLabel("DNS Servers:", self)  # Label to inform the user
+        dns_label = QLabel("DNS Servers:", self)
         layout.addWidget(dns_label)
 
-        self.dns_edit = QPlainTextEdit(self)  # Use QPlainTextEdit for multiline input
-        self.dns_edit.setPlainText("\n".join(parent.default_dns_servers))  # Display current DNS servers
+        self.dns_edit = QPlainTextEdit(self)
+        self.dns_edit.setPlainText("\n".join(parent.default_dns_servers))
         layout.addWidget(self.dns_edit)
 
         self.include_current_dns_checkbox = QCheckBox("Include current DNS", self)
@@ -276,21 +248,43 @@ class SettingsDialog(QDialog):
         self.parallel_scan_checkbox.setToolTip("Speeds up scanning with potential result accuracy trade-off.")
         layout.addWidget(self.parallel_scan_checkbox)
 
+        ping_slider_label = QLabel("Pings per server:", self)
+        layout.addWidget(ping_slider_label)
+
+        ping_slider_layout = QHBoxLayout()
+        self.ping_slider = QSlider(Qt.Horizontal, self)
+        self.ping_slider.setMinimum(1)
+        self.ping_slider.setMaximum(100)
+        self.ping_slider.setValue(parent.ping_count)
+        self.ping_slider.setTickPosition(QSlider.TicksBelow)
+        self.ping_slider.setTickInterval(10)
+        self.ping_slider.valueChanged.connect(self.update_ping_count_display)
+        ping_slider_layout.addWidget(self.ping_slider)
+
+        self.ping_count_display = QLineEdit(self)
+        self.ping_count_display.setReadOnly(True)
+        self.ping_count_display.setFixedWidth(40)
+        ping_slider_layout.addWidget(self.ping_count_display)
+
+        layout.addLayout(ping_slider_layout)
+        self.ping_count_display.setText(str(parent.ping_count))
+
         save_button = QPushButton("Save", self)
         save_button.clicked.connect(self.save_settings)
         layout.addWidget(save_button)
 
         self.setLayout(layout)
 
+    def update_ping_count_display(self, value):
+        self.ping_count_display.setText(str(value))
+
     def save_settings(self):
         dns_text = self.dns_edit.toPlainText()
         dns_servers = [server.strip() for server in dns_text.split("\n")]
         self.parent.default_dns_servers = dns_servers
-
-        # Save the state of the checkboxes in the parent
         self.parent.scan_user_dns = self.include_current_dns_checkbox.isChecked()
         self.parent.parallel_scan = self.parallel_scan_checkbox.isChecked()
-
+        self.parent.ping_count = self.ping_slider.value()
         self.accept()
 
 if __name__ == "__main__":
